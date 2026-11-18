@@ -17,21 +17,29 @@ und Multinode (remote_stage). Dazu unverändert der **PolyStrata-Patch** als
 eigener Baum. Wer bisher `strata_all`, `strata_kinetic_all` und
 `strata_multinode_all` einzeln gestapelt hat, braucht jetzt nur noch diesen einen.
 
-**Stand 12.11.2026:** Upstream-Basis `7726f80c` (0.2.13.1 / Engine **0.1.59.1**).
-Der Sammel-Patch ist auf diesem Stand geschnitten und **frisch gebaut geprüft**
-(cmake + Ninja, CUDA 12.8, `-DCMAKE_CUDA_ARCHITECTURES=86`). Der Upstream steht
-derzeit auf `f33c8c30` (0.1.59.1-Launcher-Nachzug, keine Engine-Dateien) — der
-Patch passt dorthin ebenfalls konfliktfrei.
+**Stand 16.11.2026:** Upstream-Basis `c77572806` = Tag **v0.2.15** (App 0.2.15 /
+Control **0.1.61**; die Engine-Pakete selbst blieben bei 0.1.60). Der Sammel-Patch
+ist auf diesem Stand **neu geschnitten, gebaut und geprüft** (cmake + Ninja, CUDA 12.8,
+`-DCMAKE_CUDA_ARCHITECTURES=86`, A4000 sm_86): Vollbau 523/523 Ziele fehlerfrei,
+`strata --version` = 0.1.61, `kv_turbo_parity` bitgleich, `suffix_index_test` und
+`draft_kv_plan_test` grün. Der alte Schnitt auf `7726f80c` (0.1.59.1) liegt als Tag
+`archive/engine-all-on-7726f80c`.
 
-**Nicht enthalten:** der split4-Patch (All-Cards-Split, 4×16 GB). Er wird
-derzeit separat behandelt und liegt weiterhin in `pott/strata_patch`
-(`strata_split4/`).
+**Warum der Neu-Schnitt nötig war:** ab `v0.2.14` (Engine 0.1.60) passte der alte
+Patch nicht mehr — Upstream hat DeepSeek herausgenommen und `setup.py` neu geschrieben
+(`dd96b5318`, 1886 Zeilen), `include/strata/core/native_dense.hpp` um `release()`,
+`bytes_in()`, `apply_hc_q8_default()` erweitert und `src/program/generate.cpp` für
+gfx11/HIP umgebaut. Der neue Schnitt trägt unsere Ast-Commits per
+`git rebase --onto c77572806 7726f80c` darüber.
+
+**Nicht enthalten:** der split4-Patch (All-Cards-Split, 4×16 GB). Er hat ein eigenes
+Lieferrepo: `pott/strata_split4_patch` (ebenfalls auf v0.2.15 neu geschnitten).
 
 ## Patches
 
 | Datei | Basis | Inhalt |
 |---|---|---|
-| `strata_engine/strata_engine_all.patch` | Strata main `7726f80c` (0.2.13.1 / Engine **0.1.59.1**) | **Der Sammel-Patch.** 36 Dateien, +3599/−92. Siehe Komponenten unten. |
+| `strata_engine/strata_engine_all.patch` | Strata main `c77572806` (v0.2.15 / Control **0.1.61**) | **Der Sammel-Patch.** 36 Dateien, +3599/−92, 4838 Zeilen. Siehe Komponenten unten. |
 | `polystrata/polystrata_all.patch` | PolyStrata main `4de79331` (0.1.45-poly.8) | Unverändert übernommen aus `pott/strata_patch`: deckt beide Engines des Forks ab (`strata`-Target **und** Kolibri `strata-poly` mit `--kv turbo2\|turbo3`, Parity-Test `poly_turbo_parity`). |
 
 ## Komponenten im Sammel-Patch
@@ -63,10 +71,15 @@ ortsabhängige Ausnahmen im README des Austauschordners nachgeliefert).
 
 ## Quellwahrheit (Ast in pott/strata_lokal)
 
-Der Sammel-Patch ist aus dem Ast **`agent/hermes-all-01591`** geschnitten
-(Basis `7726f80c`; Merge von `rebase/k3v8-01591`, Cherry-Pick von
-`agent/hermes-kinetic` `403d1267`, Merge von `agent/hermes-multinode-01591`
-inkl. der zwei Live-Lauf-Korrekturen von `ceb942ee`). Bei einem Upstream-Sprung
+Der Sammel-Patch ist aus dem Ast **`agent/hermes-all-0161`** geschnitten
+(Basis `c77572806` = v0.2.15; getragen von `agent/hermes-all-01591` per
+`git rebase --onto c77572806 7726f80c`; darin: turbo/k3v8, der STACK-16-Nachzug von
+turbo3, `agent/hermes-kinetic` `403d1267` und `agent/hermes-multinode-01591` inkl.
+der zwei Live-Lauf-Korrekturen). Vier Konfliktstellen waren Handarbeit: `setup.py`,
+`strata_cli/launch/cmd.py`, `strata_cli/launch/settings.py` (Upstreams DeepSeek-Aus),
+`include/strata/core/native_dense.hpp` (upstreams `skip`-Parameter mit unserem
+`release()`/`bytes_in()` verschmolzen) und `src/program/generate.cpp`
+(Hilfetexte für `--remote-stage` und `--trim-stage-weights`). Bei einem Upstream-Sprung
 wird der Ast neu getragen und der Patch aus ihm neu geschnitten.
 
 ## Ablauf rund um `update.sh`
@@ -82,10 +95,3 @@ bash <dieses-repo>/apply_patch.sh apply  strata .   # 3) Patch wieder drauf
 kann der Patch Konflikte melden — dann neu schneiden lassen (Quellwahrheit ist
 der Ast oben).
 
-## Verhältnis zu pott/strata_patch
-
-`pott/strata_patch` bleibt der historische Einzel-Lieferort (strata,
-polystrata, split4, kinetic, multinode einzeln). **Dieses Repo ist ab sofort
-die Lieferform für die Engine-Patches**: ein Patch, ein Stapel, ein Bau.
-Für den split4-Patch gilt das noch nicht — er bleibt bis auf Weiteres in
-`pott/strata_patch/strata_split4/`.

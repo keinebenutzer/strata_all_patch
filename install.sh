@@ -77,7 +77,7 @@ fi
 
 # ---------- 2) Stand anzeigen ----------
 HEAD=$(git rev-parse --short HEAD 2>/dev/null || echo "-")
-info "Stand: $HEAD   (Basis des Patches: 7726f80c = 0.2.13.1 / Engine 0.1.59.1)"
+info "Stand: $HEAD   (Basis des Patches: c77572806 = v0.2.15 / Control 0.1.61)"
 TRACKED=$(git status --porcelain 2>/dev/null | grep -vc '^??')
 [ "$TRACKED" -eq 0 ] && ok "keine getrackten Aenderungen" || warn "$TRACKED getrackte Datei(en) veraendert"
 
@@ -206,7 +206,7 @@ else
       bad "Patch passt nicht auf diesen Stand."
       echo "$ERR" | sed 's/^/         /' | head -12
       say "Diagnose"
-      info "a) der Baum steht auf einem anderen Commit als 7726f80c (aktuell: $HEAD),"
+      info "a) der Baum steht auf einem anderen Commit als c77572806 (aktuell: $HEAD),"
       info "   oder ein alter Patch liegt uncommittet darauf."
       info "b) ifoldiger Ausweg, immer in dieser Reihenfolge:"
       info "     git stash"

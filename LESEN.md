@@ -7,7 +7,7 @@ prüft, räumt alte Patches und deren Überreste selbständig weg, spielt den
 Sammel-Patch ein, baut und **beweist**, dass er drin ist:
 
 ```bash
-cd ~/Machen/strata
+cd ~/strata
 bash ../strata_all_patch/install.sh
 ```
 
@@ -36,7 +36,7 @@ bash ../strata_all_patch/test_und_aufraeumen.sh cycle --build   # Zyklus mit ech
 ## Von Hand (falls du es genau sehen willst)
 
 ```bash
-cd ~/Machen/strata
+cd ~/strata
 bash ../strata_all_patch/apply_patch.sh check strata    # 1) testen
 bash ../strata_all_patch/apply_patch.sh apply   strata  # 2) einspielen
 bash ../strata_all_patch/apply_patch.sh revert  strata  # 3) zurücknehmen
@@ -55,8 +55,8 @@ bash /pfad/zu/strata_all_patch/apply_patch.sh check strata ~/Machen/strata
 
 ## Kurz: was der Patch bringt
 
-Ein Patch für alles, was die Engine direkt angeht (Basis `7726f80c`,
-0.2.13.1 / Engine **0.1.59.1**):
+Ein Patch für alles, was die Engine direkt angeht (Basis `c77572806`,
+v0.2.15 / Control **0.1.61**):
 
 - **turbo2/turbo3/k3v8**: KV in 10/14 Byte pro 32 Werte statt 16 — derselbe
   Speicherplatz fasst mehr Kontext, und die Decode-Kerne arbeiten direkt auf
@@ -81,13 +81,13 @@ Ein Patch für alles, was die Engine direkt angeht (Basis `7726f80c`,
 `check` meldet `KP: konfliktfrei auf diesem Stand.` → einspielen.
 
 Fehler mit Konfliktzeilen → der Baum steht nicht auf der Basis des Patches
-(strata: main `7726f80c`, polystrata: main `4de79331`), oder ein alter Patch
+(strata: main `c77572806`, polystrata: main `4de79331`), oder ein alter Patch
 liegt uncommittet darauf. Dann: `git stash` → `./update.sh` → erneut testen.
 **Nie `git stash pop` nach dem update** — der alte Patch kollidiert mit dem
 neuen, der ihn ersetzt.
 
 Wer die alten Einzel-Patches (strata_all + kinetic + multinode aus
-`strata_patch`) schon drauf hat: erst alle drei `revert`en, dann diesen
+`/strata_patch`) schon drauf hat: erst alle drei `revert`en, dann diesen
 hier `apply`en — nie beide Stapel gleichzeitig:
 
 ```bash
@@ -166,7 +166,7 @@ saubersten wieder abnehmen.
 ## 4. Der Ablauf vor `update.sh` (Regelfall)
 
 ```bash
-cd ~/Machen/strata
+cd ~/strata
 bash ../strata_all_patch/apply_patch.sh revert strata    # 1) Patch runter
 ./update.sh                                              # 2) Upstream ziehen
 bash ../strata_all_patch/apply_patch.sh apply     strata # 3) Patch wieder rauf
@@ -226,7 +226,7 @@ Patchen** ist: es vergleicht den Stempel `engine/BUILD.json` mit dem Quell und
 Falls du es selbst sehen willst:
 
 ```bash
-cd ~/models/strata
+cd ~/strata
 bash ../strata_all_patch/install.sh --status     # Binary, Stempel, Quellversion
 cat engine/BUILD.json | head -6                  # source: local oder prebuilt?
 ./engine/strata --help 2>&1 | grep -o 'turbo2\|turbo3\|k3v8\|remote-stage' | sort -u
