@@ -7,7 +7,7 @@ prüft, räumt alte Patches und deren Überreste selbständig weg, spielt den
 Sammel-Patch ein, baut und **beweist**, dass er drin ist:
 
 ```bash
-cd ~/strata
+cd ~/Machen/strata
 bash ../strata_all_patch/install.sh
 ```
 
@@ -36,7 +36,7 @@ bash ../strata_all_patch/test_und_aufraeumen.sh cycle --build   # Zyklus mit ech
 ## Von Hand (falls du es genau sehen willst)
 
 ```bash
-cd ~/strata
+cd ~/Machen/strata
 bash ../strata_all_patch/apply_patch.sh check strata    # 1) testen
 bash ../strata_all_patch/apply_patch.sh apply   strata  # 2) einspielen
 bash ../strata_all_patch/apply_patch.sh revert  strata  # 3) zurücknehmen
@@ -55,8 +55,10 @@ bash /pfad/zu/strata_all_patch/apply_patch.sh check strata ~/Machen/strata
 
 ## Kurz: was der Patch bringt
 
-Ein Patch für alles, was die Engine direkt angeht (Basis `c77572806`,
-v0.2.15 / Control **0.1.61**):
+Ein Patch für alles, was die Engine direkt angeht (Basis `58ee32277`,
+v0.2.16 / Engine **0.1.62**). Ab 0.2.16 liegt der Engine-Quell in `engine/`,
+`setup.py` und der Launcher in `terminal/`, und der gebaute Engine kommt nach
+`terminal/engine/`:
 
 - **turbo2/turbo3/k3v8**: KV in 10/14 Byte pro 32 Werte statt 16 — derselbe
   Speicherplatz fasst mehr Kontext, und die Decode-Kerne arbeiten direkt auf
@@ -75,19 +77,23 @@ v0.2.15 / Control **0.1.61**):
   `--remote-stage local --layer-split 40,44`. Ohne `--remote-stage` verhält
   sich die Engine wie ohne Patch.
 
+Der split4-Patch (All-Cards-Split) ist **nicht enthalten** — er liegt weiterhin
+in `strata_patch/strata_split4/`.
 
 ## 1. Testen — passt der Patch auf meinen Stand?
 
 `check` meldet `KP: konfliktfrei auf diesem Stand.` → einspielen.
 
 Fehler mit Konfliktzeilen → der Baum steht nicht auf der Basis des Patches
-(strata: main `c77572806`, polystrata: main `4de79331`), oder ein alter Patch
-liegt uncommittet darauf. Dann: `git stash` → `./update.sh` → erneut testen.
+(strata: main `58ee32277`, polystrata: main `4de79331`), oder ein alter Patch
+liegt uncommittet darauf. Dann: `git stash` → `./setup.sh --update` → erneut testen.
+(Ab 0.2.16 gibt es kein `update.sh` mehr — Linux zieht Upstream mit `./setup.sh --update`,
+Windows mit `UPDATE.bat`.)
 **Nie `git stash pop` nach dem update** — der alte Patch kollidiert mit dem
 neuen, der ihn ersetzt.
 
 Wer die alten Einzel-Patches (strata_all + kinetic + multinode aus
-`/strata_patch`) schon drauf hat: erst alle drei `revert`en, dann diesen
+`strata_patch`) schon drauf hat: erst alle drei `revert`en, dann diesen
 hier `apply`en — nie beide Stapel gleichzeitig:
 
 ```bash
@@ -119,21 +125,21 @@ git status --short -- include/strata/kernels/kv_turbo.hpp src/spec/suffix_index.
 
 `KP: angewandt (nicht committet).` — danach neu bauen. Der übliche Weg erkennt
 die geänderten Quellen selbst (Hash der Engine-Quellen gegen `src` in
-`engine/BUILD.json`) und kompiliert nur, was geändert ist:
+`terminal/engine/BUILD.json`) und kompiliert nur, was geändert ist:
 
 ```bash
 ./setup.sh --build --no-start
 ```
 
-Das legt `engine/strata` (und `libstrata_kq.so`) neu ab und schreibt `BUILD.json`
-neu. Von Hand über das vorhandene `build/`:
+Das legt `terminal/engine/strata` neu ab und schreibt `terminal/engine/BUILD.json`
+neu. (Das frühere `libstrata_kq.so` gibt es seit 0.2.16 nicht mehr — Upstream hat
+den MMQ-Pfad entfernt.) Von Hand über das vorhandene `build/`:
 `cmake --build build --target strata -j"$(nproc)"`, dann
-`cp build/strata engine/strata` und, wenn vorhanden,
-`cp build/libstrata_kq.so engine/` — dabei bleibt der `src`-Hash in `BUILD.json`
-stehen, beim nächsten `./setup.sh` wird also einmal umsonst neu gebaut.
-Läuft `engine/strata` gerade, kann der Zurückschiebe-Schritt mit „Text file
-busy“ fehlschlagen — erst die Engine stoppen, dann bauen (oder per `mv`
-austauschen).
+`cp build/strata terminal/engine/strata` — dabei bleibt der `src`-Hash in
+`BUILD.json` stehen, beim nächsten `./setup.sh` wird also einmal umsonst neu
+gebaut. Läuft `terminal/engine/strata` gerade, kann der Zurückschiebe-Schritt
+mit „Text file busy“ fehlschlagen — erst die Engine stoppen, dann bauen (oder
+per `mv` austauschen).
 
 **Beim ersten eigenen Bau (cmake neu konfigurieren):** CUDA muss ausdrücklich
 angestellt werden (`-DSTRATA_ENABLE_CUDA=ON`), und CMake wählt auf manchen
@@ -142,7 +148,7 @@ gesetzt). Der Bau gelingt, aber jede KV-Kernel-Ausführung endet mit
 `no kernel image is available for execution on the device`. Deshalb explizit:
 
 ```bash
-cmake -S . -B build -G Ninja -DSTRATA_ENABLE_CUDA=ON -DCMAKE_CUDA_ARCHITECTURES=86
+cmake -S engine -B build -G Ninja -DSTRATA_ENABLE_CUDA=ON -DCMAKE_CUDA_ARCHITECTURES=86
 ninja -C build strata
 ```
 
@@ -152,7 +158,7 @@ Nach dem Bau prüfen, dass der Patch wirklich drin ist (`--version` bleibt
 unverändert, die Version hebt der Patch nicht):
 
 ```bash
-./engine/strata --help | grep -o 'turbo2\|turbo3\|k3v8\|remote-stage\|stage-listen' | sort -u
+./terminal/engine/strata --help 2>&1 | grep -o 'turbo2\|turbo3\|k3v8\|remote-stage\|stage-listen' | sort -u
 ```
 
 Ohne Patch kommt nichts zurück, mit Patch erscheinen `k3v8 remote-stage stage-listen
@@ -163,19 +169,19 @@ saubersten wieder abnehmen.
 
 `KP: zurueckgenommen.` — der Baum ist wieder im reinen Upstream-Stand.
 
-## 4. Der Ablauf vor `update.sh` (Regelfall)
+## 4. Der Ablauf vor dem Update (Regelfall)
 
 ```bash
-cd ~/strata
+cd ~/Machen/strata
 bash ../strata_all_patch/apply_patch.sh revert strata    # 1) Patch runter
-./update.sh                                              # 2) Upstream ziehen
+./setup.sh --update                                      # 2) Upstream ziehen (0.2.16; vorher ./update.sh)
 bash ../strata_all_patch/apply_patch.sh apply     strata # 3) Patch wieder rauf
 ```
 
 Meldet der Patch nach einem Upstream-Sprung Konflikte, ist der Upstream über
 die gepatchten Stellen hinweggegangen: erst mit `check` prüfen, dann neu
-schneiden lassen (Quellwahrheit ist der Ast `agent/hermes-all-01591` in
-`pott/strata_lokal`) oder die betroffenen Dateien per `git checkout -- <datei>`
+schneiden lassen (Quellwahrheit ist der Ast `agent/hermes-all-0162` in
+`strata_lokal`) oder die betroffenen Dateien per `git checkout -- <datei>`
 zurücksetzen und erneut `apply` versuchen.
 
 ## 5. Kinetic einschalten (erst damit wirkt dieser Teil)
@@ -213,23 +219,23 @@ passiert nichts.
 | `Patch liegt schon vollständig drauf` | der Sammel-Patch ist bereits angewandt | nichts — höchstens `test_und_aufraeumen.sh tests` |
 | `… already exists in working directory` | Überreste der **alten** Turbo-/Kinetic-Patches | Skript nimmt alte Patches selbst ab und fragt, ob die Überreste gelöscht werden |
 | `Diese Dateien sind COMMITTET` | alter Patch steckt in Commits | Skript löscht **nichts**; Baum auf reinen Upstream bringen (`git log --oneline -5`) |
-| `Patch passt nicht auf diesen Stand` | anderer Upstream-Commit oder Alt-Patch drauf | `git stash` → `./update.sh` → erneut `install.sh` |
+| `Patch passt nicht auf diesen Stand` | anderer Upstream-Commit oder Alt-Patch drauf | `git stash` → `./setup.sh --update` → erneut `install.sh` |
 | `Text file busy` beim Bauen | Engine läuft | Skript fragt, ob es sie stoppen darf |
-| `fehlen im gebauten Binary` + `Quell ist gepatcht, der Binary ist es nicht` | `setup.sh` hat einen **alten** Engine-Bau weiterverwendet (der Stempel `engine/BUILD.json` sagt „passt“, der Binary ist aber von vor dem Patchen) | Skript baut von Hand neu und setzt `engine/strata` selbst ein; der alte bleibt als `engine/strata.vorher` erhalten |
+| `fehlen im gebauten Binary` + `Quell ist gepatcht, der Binary ist es nicht` | `setup.sh` hat einen **alten** Engine-Bau weiterverwendet (der Stempel `terminal/engine/BUILD.json` sagt „passt“, der Binary ist aber von vor dem Patchen) | Skript baut von Hand neu und setzt `terminal/engine/strata` selbst ein; der alte bleibt als `terminal/engine/strata.vorher` erhalten |
 | `kein nvcc gefunden` | CUDA-Toolkit fehlt | installieren, oder nur `--no-build` nutzen |
 
 ## Wenn der Nachweis fehlt („fehlen im gebauten Binary")
 
-`setup.sh` kann „durchgelaufen" melden, obwohl `engine/strata` **von vor dem
-Patchen** ist: es vergleicht den Stempel `engine/BUILD.json` mit dem Quell und
+`setup.sh` kann „durchgelaufen" melden, obwohl `terminal/engine/strata` **von vor dem
+Patchen** ist: es vergleicht den Stempel `terminal/engine/BUILD.json` mit dem Quell und
 überspringt den Bau, wenn er passt. `install.sh` merkt das und baut von Hand neu.
 Falls du es selbst sehen willst:
 
 ```bash
-cd ~/strata
+cd ~/models/strata
 bash ../strata_all_patch/install.sh --status     # Binary, Stempel, Quellversion
-cat engine/BUILD.json | head -6                  # source: local oder prebuilt?
-./engine/strata --help 2>&1 | grep -o 'turbo2\|turbo3\|k3v8\|remote-stage' | sort -u
+cat terminal/engine/BUILD.json | head -6          # source: local oder prebuilt?
+./terminal/engine/strata --help 2>&1 | grep -o 'turbo2\|turbo3\|k3v8\|remote-stage' | sort -u
 ```
 
 Lehrstück: **`--version` beweist nichts** (der Patch ändert die Version nicht) und
@@ -241,5 +247,5 @@ die Feature-Abfrage am Binary.
 Überall einfach `strata` durch `polystrata` ersetzen. Der PolyStrata-Patch
 (Basis `4de79331`, 0.1.45-poly.8) deckt beide Engines des Forks ab
 (`strata`-Target und Kolibri `strata-poly` mit `--kv turbo2|turbo3`,
-Parity-Test `poly_turbo_parity`). Er ist unverändert aus `pott/strata_patch`
+Parity-Test `poly_turbo_parity`). Er ist unverändert aus `strata_patch`
 übernommen.

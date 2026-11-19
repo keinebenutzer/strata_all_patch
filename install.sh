@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 # install.sh — gefuehrte Installation des Sammel-Patches (turbo2+turbo3+k3v8+Kinetic+Multinode)
+# Basis: v0.2.16 (58ee32277, Engine 0.1.62). Fuer Baeume auf 0.2.15 gibt es den alten Schnitt als Tag
+# archive/engine-all-on-c77572806 im Repo pott/strata_all_patch.
 #
 #   bash install.sh                      Strata-Baum wird automatisch gefunden
 #   bash install.sh <strata-ordner>      oder explizit angeben
@@ -21,12 +23,12 @@ HERE="$(cd "$(dirname "$0")" && pwd)"
 PATCH="$HERE/strata_engine/strata_engine_all.patch"
 OLD_REPO_HINT="(cd <patch-Ordner> && bash apply_patch.sh revert strata)"
 NEW_FILES=(
-  include/strata/kernels/kv_turbo.hpp include/strata/kernels/kv_turbo3.hpp
-  include/strata/kernels/kv_k3v8.hpp include/strata/core/remote_stage.hpp
-  include/strata/spec/suffix_index.hpp
-  src/kernels/cuda/kv_turbo.cu src/kernels/cuda/kv_turbo3.cu
-  src/kernels/kv_turbo_parity.cpp src/core/remote_stage.cpp
-  src/spec/suffix_index.cpp src/spec/suffix_index_test.cpp
+  engine/include/strata/kernels/kv_turbo.hpp engine/include/strata/kernels/kv_turbo3.hpp
+  engine/include/strata/kernels/kv_k3v8.hpp engine/include/strata/core/remote_stage.hpp
+  engine/include/strata/spec/suffix_index.hpp
+  engine/src/kernels/cuda/kv_turbo.cu engine/src/kernels/cuda/kv_turbo3.cu
+  engine/src/kernels/kv_turbo_parity.cpp engine/src/core/remote_stage.cpp
+  engine/src/spec/suffix_index.cpp engine/src/spec/suffix_index_test.cpp
 )
 PROBE='turbo2|turbo3|k3v8|remote-stage|stage-listen|stage-layers|stage-allow'
 EXPECT_FILES=36
@@ -54,7 +56,13 @@ info() { printf '        %s\n' "$*"; }
 [ -f "$PATCH" ] || { bad "Patch-Datei fehlt: $PATCH"; exit 2; }
 
 # ---------- 1) Baum finden ----------
-looks_like_strata() { [ -f "$1/CMakeLists.txt" ] && grep -q "project(strata VERSION" "$1/CMakeLists.txt"; }
+# 0.2.16 (Layout-Move 4058aa782): der Engine-Baum liegt in engine/, Terminal und App in terminal/ und app/.
+# Aeltere Baeume haben CMakeLists.txt oben. Beides wird erkannt; SRC ist der cmake-Quell, DEPLOY der Ordner,
+# in dem setup.sh den fertigen Engine-Binary ablegt.
+looks_like_strata() {
+  { [ -f "$1/engine/CMakeLists.txt" ] && grep -q "project(strata VERSION" "$1/engine/CMakeLists.txt"; } || \
+  { [ -f "$1/CMakeLists.txt" ] && grep -q "project(strata VERSION" "$1/CMakeLists.txt"; }
+}
 find_dir() {
   local c=(. .. ./strata ./Strata ../strata ../Strata "$HOME/models/strata" "$HOME/models/Strata" "$HOME/Machen/strata" "$HOME/Machen/Strata")
   for d in "${c[@]}"; do looks_like_strata "$d" && { echo "$d"; return; }; done
@@ -62,13 +70,15 @@ find_dir() {
 DIR="${DIR_ARG:-$(find_dir)}"
 [ -n "${DIR:-}" ] && looks_like_strata "$DIR" || {
   bad "Kein Strata-Baum gefunden."
-  info "Ich suche ein CMakeLists.txt mit 'project(strata VERSION' — hier, eine Ebene hoeher,"
+  info "Ich suche ein engine/CMakeLists.txt (ab 0.2.16) oder CMakeLists.txt (aelter) mit 'project(strata VERSION' — hier, eine Ebene hoeher,"
   info "../strata, ../Strata, ~/Machen/strata."
   info "Sag mir den Pfad direkt:  bash install.sh /pfad/zum/strata"
   exit 2
 }
 cd "$DIR" || exit 2
-ENGINE_VERSION=$(sed -n 's/.*project(strata VERSION \([0-9.]*\).*/\1/p' CMakeLists.txt | head -1)
+if [ -f engine/CMakeLists.txt ]; then SRC=engine; DEPLOY=terminal/engine; else SRC=.; DEPLOY=engine; fi
+CMK="$SRC/CMakeLists.txt"
+ENGINE_VERSION=$(sed -n 's/.*project(strata VERSION \([0-9.]*\).*/\1/p' "$CMK" | head -1)
 say "Strata-Baum: $PWD  (Engine $ENGINE_VERSION)"
 
 if [ ! -e .git ]; then
@@ -77,13 +87,14 @@ fi
 
 # ---------- 2) Stand anzeigen ----------
 HEAD=$(git rev-parse --short HEAD 2>/dev/null || echo "-")
-info "Stand: $HEAD   (Basis des Patches: c77572806 = v0.2.15 / Control 0.1.61)"
+info "Stand: $HEAD   (Basis des Patches: 58ee32277 = v0.2.16 / Engine 0.1.62)"
+info "Layout: Engine-Quell in $SRC, gebauter Binary in $DEPLOY"
 TRACKED=$(git status --porcelain 2>/dev/null | grep -vc '^??')
 [ "$TRACKED" -eq 0 ] && ok "keine getrackten Aenderungen" || warn "$TRACKED getrackte Datei(en) veraendert"
 
 probe_binary() {
   local b
-  for b in engine/strata build/strata; do
+  for b in terminal/engine/strata engine/strata build/strata; do
     [ -x "$b" ] || continue
     local f; f=$("$b" --help 2>&1 | grep -oE "$PROBE" | sort -u | tr '\n' ' ')
     local kinetic="nein"
@@ -96,7 +107,7 @@ probe_binary() {
 show_binary() {
   local name feats kinetic
   { read -r name; read -r feats; read -r kinetic; } < <(probe_binary)
-  if [ -z "$name" ]; then info "kein Bau gefunden (engine/strata, build/strata)"; return; fi
+  if [ -z "$name" ]; then info "kein Bau gefunden (terminal/engine/strata, engine/strata, build/strata)"; return; fi
   if [ -n "$feats" ]; then
     ok "$name enthaelt: $feats  Kinetic: $kinetic"
   else
@@ -109,16 +120,16 @@ patch_in_source() {
   echo "$n"
 }
 diag_binary() {
-  local b=engine/strata
+  local b=$DEPLOY/strata
   [ -x "$b" ] || b=build/strata
   [ -x "$b" ] || { info "kein Binary gefunden"; return; }
   info "Binary $b: Version $("$b" --version 2>&1 | head -1), Datei vom $(date -r "$b" '+%d.%m. %H:%M' 2>/dev/null)"
-  if [ -f engine/BUILD.json ]; then
-    info "engine/BUILD.json: source=$(sed -n 's/.*"source": *"\([a-z]*\)".*/\1/p' engine/BUILD.json | head -1) version=$(sed -n 's/.*"version": *"\([0-9.]*\)".*/\1/p' engine/BUILD.json | head -1)"
+  if [ -f $DEPLOY/BUILD.json ]; then
+    info "$DEPLOY/BUILD.json: source=$(sed -n 's/.*"source": *"\([a-z]*\)".*/\1/p' $DEPLOY/BUILD.json | head -1) version=$(sed -n 's/.*"version": *"\([0-9.]*\).*/\1/p' $DEPLOY/BUILD.json | head -1)"
   else
-    info "engine/BUILD.json fehlt — dieser Binary wurde nicht von setup.sh gebaut"
+    info "$DEPLOY/BUILD.json fehlt — dieser Binary wurde nicht von setup.sh gebaut"
   fi
-  info "Quellversion in CMakeLists.txt: $(sed -n 's/.*project(strata VERSION \([0-9.]*\).*/\1/p' CMakeLists.txt | head -1)"
+  info "Quellversion in $CMK: $(sed -n 's/.*project(strata VERSION \([0-9.]*\).*/\1/p' "$CMK" | head -1)"
 }
 
 verify_engine() {
@@ -147,17 +158,18 @@ verify_engine() {
     A=$(nvidia-smi --query-gpu=compute_cap --format=csv,noheader 2>/dev/null | head -1 | tr -d '.')
     [ -n "$A" ] && ARCH="$A"
   fi
+  [ -x terminal/.venv/bin/ninja ] && NINJA=terminal/.venv/bin/ninja
   [ -x .venv/bin/ninja ] && NINJA=.venv/bin/ninja
-  info "nvcc=$NVCC  Architektur sm_$ARCH  Build-Ordner build/"
+  info "nvcc=$NVCC  Architektur sm_$ARCH  Build-Ordner build/  (cmake -S $SRC)"
   rm -rf build
-  CUDACXX="$NVCC" cmake -S . -B build -G Ninja -DSTRATA_ENABLE_CUDA=ON -DCMAKE_CUDA_ARCHITECTURES="$ARCH" || { bad "cmake fehlgeschlagen"; return 1; }
+  CUDACXX="$NVCC" cmake -S "$SRC" -B build -G Ninja -DSTRATA_ENABLE_CUDA=ON -DCMAKE_CUDA_ARCHITECTURES="$ARCH" || { bad "cmake fehlgeschlagen"; return 1; }
   if ! "$NINJA" -C build strata; then bad "Bau fehlgeschlagen — Meldung oben"; return 1; fi
-  mkdir -p engine
-  [ -f engine/strata ] && mv engine/strata engine/strata.vorher
-  cp build/strata engine/strata
-  [ -f engine/BUILD.json ] && mv engine/BUILD.json engine/BUILD.json.vorher
-  ok "neuer engine/strata eingesetzt (der alte liegt als engine/strata.vorher bereit)"
-  info "Der Stempel engine/BUILD.json ist entfernt: das naechste ./setup.sh baut sauber weiter."
+  mkdir -p "$DEPLOY"
+  [ -f "$DEPLOY/strata" ] && mv "$DEPLOY/strata" "$DEPLOY/strata.vorher"
+  cp build/strata "$DEPLOY/strata"
+  [ -f "$DEPLOY/BUILD.json" ] && mv "$DEPLOY/BUILD.json" "$DEPLOY/BUILD.json.vorher"
+  ok "neuer $DEPLOY/strata eingesetzt (der alte liegt als $DEPLOY/strata.vorher bereit)"
+  info "Der Stempel $DEPLOY/BUILD.json ist entfernt: das naechste ./setup.sh baut sauber weiter."
   FOUND=$(probe_binary | sed -n '2p')
   MISS=""
   for w in turbo2 turbo3 k3v8 remote-stage stage-listen; do
@@ -206,7 +218,7 @@ else
       bad "Patch passt nicht auf diesen Stand."
       echo "$ERR" | sed 's/^/         /' | head -12
       say "Diagnose"
-      info "a) der Baum steht auf einem anderen Commit als c77572806 (aktuell: $HEAD),"
+      info "a) der Baum steht auf einem anderen Commit als 58ee32277 = v0.2.16 (aktuell: $HEAD),"
       info "   oder ein alter Patch liegt uncommittet darauf."
       info "b) ifoldiger Ausweg, immer in dieser Reihenfolge:"
       info "     git stash"
@@ -324,8 +336,9 @@ if [ "$BUILD_OK" = "0" ]; then
     A=$(nvidia-smi --query-gpu=compute_cap --format=csv,noheader 2>/dev/null | head -1 | tr -d '.')
     [ -n "$A" ] && ARCH="$A" && info "GPU-Rechenwerk (nvidia-smi): $ARCH"
   fi
-  NINJA=ninja; [ -x .venv/bin/ninja ] && NINJA=.venv/bin/ninja
-  CUDACXX="$NVCC" cmake -S . -B build -G Ninja -DSTRATA_ENABLE_CUDA=ON -DCMAKE_CUDA_ARCHITECTURES="$ARCH" || { bad "cmake fehlgeschlagen"; exit 1; }
+  NINJA=ninja; [ -x terminal/.venv/bin/ninja ] && NINJA=terminal/.venv/bin/ninja
+  [ -x .venv/bin/ninja ] && NINJA=.venv/bin/ninja
+  CUDACXX="$NVCC" cmake -S "$SRC" -B build -G Ninja -DSTRATA_ENABLE_CUDA=ON -DCMAKE_CUDA_ARCHITECTURES="$ARCH" || { bad "cmake fehlgeschlagen"; exit 1; }
   if "$NINJA" -C build strata; then ok "Notfall-Bau durchgelaufen"; BUILD_OK=1
   else bad "Bau fehlgeschlagen — Meldung oben im Bau-Log nachlesen"; exit 1; fi
 fi

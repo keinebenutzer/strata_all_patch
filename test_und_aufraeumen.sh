@@ -138,7 +138,8 @@ do_cycle() {
     else
       ARCH=86
       command -v nvidia-smi >/dev/null 2>&1 && { A=$(nvidia-smi --query-gpu=compute_cap --format=csv,noheader 2>/dev/null | head -1 | tr -d '.'); [ -n "$A" ] && ARCH="$A"; }
-      (cd "$TMP" && CUDACXX="$NVCC" cmake -S . -B build -G Ninja -DSTRATA_ENABLE_CUDA=ON -DCMAKE_CUDA_ARCHITECTURES="$ARCH" >/dev/null && ninja -C build strata kv_turbo_parity suffix_index_test) \
+      SRC=engine; [ -f "$TMP/CMakeLists.txt" ] && SRC=.
+      (cd "$TMP" && CUDACXX="$NVCC" cmake -S "$SRC" -B build -G Ninja -DSTRATA_ENABLE_CUDA=ON -DCMAKE_CUDA_ARCHITECTURES="$ARCH" >/dev/null && ninja -C build strata kv_turbo_parity suffix_index_test) \
         && ok "4) Bau der Kopie durchgelaufen" || bad "4) Bau der Kopie fehlgeschlagen"
       if [ -x "$TMP/build/strata" ]; then
         F=$("$TMP/build/strata" --help 2>&1 | grep -oE "$PROBE" | sort -u | tr '\n' ' ')

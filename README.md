@@ -17,29 +17,48 @@ und Multinode (remote_stage). Dazu unverändert der **PolyStrata-Patch** als
 eigener Baum. Wer bisher `strata_all`, `strata_kinetic_all` und
 `strata_multinode_all` einzeln gestapelt hat, braucht jetzt nur noch diesen einen.
 
-**Stand 16.11.2026:** Upstream-Basis `c77572806` = Tag **v0.2.15** (App 0.2.15 /
-Control **0.1.61**; die Engine-Pakete selbst blieben bei 0.1.60). Der Sammel-Patch
-ist auf diesem Stand **neu geschnitten, gebaut und geprüft** (cmake + Ninja, CUDA 12.8,
-`-DCMAKE_CUDA_ARCHITECTURES=86`, A4000 sm_86): Vollbau 523/523 Ziele fehlerfrei,
-`strata --version` = 0.1.61, `kv_turbo_parity` bitgleich, `suffix_index_test` und
-`draft_kv_plan_test` grün. Der alte Schnitt auf `7726f80c` (0.1.59.1) liegt als Tag
-`archive/engine-all-on-7726f80c`.
+**Stand 19.11.2026:** Upstream-Basis `58ee32277` = Tag **v0.2.16** (App 0.2.16,
+Engine **0.1.62**). Der Sammel-Patch ist auf diesem Stand **neu geschnitten, gebaut und
+geprüft** (cmake + Ninja, CUDA 12.8, `-DCMAKE_CUDA_ARCHITECTURES=86`, A4000 sm_86):
+`strata` fehlerfrei, `strata --help` nennt turbo2/turbo3/k3v8 und die vier
+Multinode-Schalter, `kv_turbo_parity` 11/11 bitgleich (turbo3 1.3042, k3v8-V 0.0325),
+`suffix_index_test` grün, `check_cuda_spills` ohne Verstoß aus unseren Dateien (upstream bringt
+eigenen: `i8_kernel` in `iq_kernels.cu`, STACK 8 auf sm_86), Launcher-Test `test_launch_tui.ContextStep`
+6/6 — er prüft den KV-Zyklus `int8 → q4_0 → turbo3 → k3v8 → turbo2` in den neuen Screens. (Der Rest
+dieser Testdatei braucht `textual` und fällt in der Sandbox auf gepatchtem wie sauberem Baum gleich.)
+Alte Schnitte: Tag `archive/engine-all-on-c77572806` (v0.2.15) und
+`archive/engine-all-on-7726f80c` (0.1.59.1).
 
-**Warum der Neu-Schnitt nötig war:** ab `v0.2.14` (Engine 0.1.60) passte der alte
-Patch nicht mehr — Upstream hat DeepSeek herausgenommen und `setup.py` neu geschrieben
-(`dd96b5318`, 1886 Zeilen), `include/strata/core/native_dense.hpp` um `release()`,
-`bytes_in()`, `apply_hc_q8_default()` erweitert und `src/program/generate.cpp` für
-gfx11/HIP umgebaut. Der neue Schnitt trägt unsere Ast-Commits per
-`git rebase --onto c77572806 7726f80c` darüber.
+**Warum der Neu-Schnitt nötig war:** 0.2.16 hat den Baum umgebaut (Layout-Move
+`4058aa782`): der Engine-Quell liegt in `engine/` (`engine/CMakeLists.txt`,
+`engine/src`, `engine/include`, `engine/cmake`), Terminal mit `setup.py`,
+`strata_cli`, `strata_control`, `serve` in `terminal/`, die App in `app/`. Gebaut wird
+`cmake -S engine`, und `setup.py` legt den fertigen Engine in **`terminal/engine/`** ab
+(`engine_src()` in `terminal/setup.py`). Der Patch wurde mit
+`git rebase --onto 58ee32277 c77572806` getragen; Git erkannte die Verschiebung, es
+blieben vier Handarbeitstellen:
 
-**Nicht enthalten:** der split4-Patch (All-Cards-Split, 4×16 GB). Er hat ein eigenes
-Lieferrepo: `pott/strata_split4_patch` (ebenfalls auf v0.2.15 neu geschnitten).
+* `engine/src/core/verify.cpp` — upstream hat in `record_window` das Batchen umgebaut
+  (`m > 1` → `*_steps`, sonst `*_step`, mit `step_t`/`kc`/`vc`); unsere turbo2/turbo3/k3v8-
+  Zweige stehen jetzt in derselben Kette, direkt nach `kv_hybrid`/`kv_k3v8`.
+* `terminal/strata_cli/launch/settings.py` — upstream schob `DRAFT_VOCAB_MODES` über unsere
+  `KV_MODES`-Zeile; unsere Zeile bleibt die extended.
+* `engine/src/split/CMakeLists.txt` (split4) — upstream fügte `pf_pick_test` in die
+  Testliste; unsere `arch_caps_test` kommt dazu.
+* **`src/split/tools/qdot_test.cu` ist weg:** upstream hat mit „own-stack step 10"
+  (`3e26b4e15`) die vendored `ggml-cuda` und damit diesen Oracle-Test entfernt. Unsere
+  IQ2_XS/IQ2_XXS-Decode-Dots in `qdot.cuh` sind weiter drin, aber ihr Bitgleichheits-Test
+  hat kein Zuhause mehr — `split_qdot_golden` kennt nur bis IQ2_S. **Offene Lücke**, ein
+  eigener Nachfolge-Test ist noch zu schreiben.
+* Nachtrag beim Bau: der von uns ergänzte CUDA-Zweig `strata-split-selftest` brauchte
+  Stratas eigene Quant-Includes (`${_sp_quant}`) statt der entfernten ggml-cuda-Pfade.
+
 
 ## Patches
 
 | Datei | Basis | Inhalt |
 |---|---|---|
-| `strata_engine/strata_engine_all.patch` | Strata main `c77572806` (v0.2.15 / Control **0.1.61**) | **Der Sammel-Patch.** 36 Dateien, +3599/−92, 4838 Zeilen. Siehe Komponenten unten. |
+| `strata_engine/strata_engine_all.patch` | Strata main `58ee32277` (v0.2.16 / Engine **0.1.62**) | **Der Sammel-Patch.** 36 Dateien, +3597/−92, 4836 Zeilen. Siehe Komponenten unten. |
 | `polystrata/polystrata_all.patch` | PolyStrata main `4de79331` (0.1.45-poly.8) | Unverändert übernommen aus `pott/strata_patch`: deckt beide Engines des Forks ab (`strata`-Target **und** Kolibri `strata-poly` mit `--kv turbo2\|turbo3`, Parity-Test `poly_turbo_parity`). |
 
 ## Komponenten im Sammel-Patch
