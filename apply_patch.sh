@@ -2,10 +2,11 @@
 # apply_patch.sh [check|apply|revert] [strata|polystrata] [verzeichnis]
 # Der EINE Groß-Patch auf/vom Strata-Engine-Baum. Vor update.sh: revert; danach: apply.
 # strata     = Sammel-Patch: turbo2 + turbo3 + k3v8 + Kinetic + Multinode
-#              (Basis c77572806 = v0.2.15 / Control 0.1.61; alter Schnitt: Tag archive/engine-all-on-7726f80c).
+#              (Basis 12d491da4 = v0.2.17 / Engine 0.1.63; aeltere Schnitte: Tags
+#              archive/engine-all-on-58ee32277 und archive/engine-all-on-c77572806).
 # polystrata = der PolyStrata-Fork-Patch (Basis 4de79331 = 0.1.45-poly.8), unveraendert.
-# split4 wird hier NICHT gefuehrt — der All-Cards-Split laeuft weiterhin aus
-# pott/strata_patch (strata_split4/).
+# split4 wird hier NICHT gefuehrt — der All-Cards-Split hat ein eigenes Lieferrepo
+# (strata_split4_patch).
 set -euo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
 MODE="${1:-check}"

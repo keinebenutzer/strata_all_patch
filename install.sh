@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # install.sh — gefuehrte Installation des Sammel-Patches (turbo2+turbo3+k3v8+Kinetic+Multinode)
-# Basis: v0.2.16 (58ee32277, Engine 0.1.62). Fuer Baeume auf 0.2.15 gibt es den alten Schnitt als Tag
-# archive/engine-all-on-c77572806 im Repo pott/strata_all_patch.
+# Basis: v0.2.17 (12d491da4, Engine 0.1.63). Fuer Baeume auf aelteren Staenden gibt es
+# die alten Schnitte als Tags archive/engine-all-on-58ee32277 und archive/engine-all-on-c77572806.
 #
 #   bash install.sh                      Strata-Baum wird automatisch gefunden
 #   bash install.sh <strata-ordner>      oder explizit angeben
@@ -14,7 +14,7 @@
 # Das Skript erkennt von selbst:
 #   - ob der Patch schon drauf liegt   -> nichts zu tun
 #   - Ueberreste alter Turbo-/Kinetic-Patches ("already exists in working directory")
-#   - alte Einzel-Patches aus pott/strata_patch, die noch angewandt sind
+#   - alte Einzel-Patches aus aelteren Lieferrepos, die noch angewandt sind
 #   - eine laufende Engine, die "Text file busy" verursacht
 #   - CUDA-Compiler und GPU-Architektur fuer den Notfall-Bau von Hand
 set -uo pipefail
@@ -87,7 +87,7 @@ fi
 
 # ---------- 2) Stand anzeigen ----------
 HEAD=$(git rev-parse --short HEAD 2>/dev/null || echo "-")
-info "Stand: $HEAD   (Basis des Patches: 58ee32277 = v0.2.16 / Engine 0.1.62)"
+info "Stand: $HEAD   (Basis des Patches: 12d491da4 = v0.2.17 / Engine 0.1.63)"
 info "Layout: Engine-Quell in $SRC, gebauter Binary in $DEPLOY"
 TRACKED=$(git status --porcelain 2>/dev/null | grep -vc '^??')
 [ "$TRACKED" -eq 0 ] && ok "keine getrackten Aenderungen" || warn "$TRACKED getrackte Datei(en) veraendert"
@@ -218,11 +218,11 @@ else
       bad "Patch passt nicht auf diesen Stand."
       echo "$ERR" | sed 's/^/         /' | head -12
       say "Diagnose"
-      info "a) der Baum steht auf einem anderen Commit als 58ee32277 = v0.2.16 (aktuell: $HEAD),"
+      info "a) der Baum steht auf einem anderen Commit als 12d491da4 = v0.2.17 (aktuell: $HEAD),"
       info "   oder ein alter Patch liegt uncommittet darauf."
       info "b) ifoldiger Ausweg, immer in dieser Reihenfolge:"
       info "     git stash"
-      info "     ./update.sh"
+      info "     ./setup.sh --update   (Linux; Windows: UPDATE.bat)"
       info "     bash $HERE/apply_patch.sh check strata"
       info "   NIEMALS 'git stash pop' nach dem update — der alte Patch kollidiert mit dem neuen."
       exit 1
@@ -236,7 +236,7 @@ else
     warn "Patch passt noch nicht: Dateien liegen bereits im Weg."
     echo "$ERR" | grep "already exists" | sed 's/^/         /'
     say "Aufraeumen: Ueberreste alter Patches"
-    info "Das sind die Neudateien der alten Turbo-/Kinetic-Patches aus pott/strata_patch."
+    info "Das sind die Neudateien aelterer Turbo-/Kinetic-Einzel-Patches."
     # alte Einzel-Patches zuerst sauber zuruecknehmen, wenn ihr Repo zu finden ist
     OLD_SH=""
     for cand in ../strata_patch/apply_patch.sh "$HERE/../strata_patch/apply_patch.sh"; do

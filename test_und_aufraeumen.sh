@@ -7,7 +7,7 @@
 #   bash test_und_aufraeumen.sh full         cycle + cleanup + tests
 #   bash test_und_aufraeumen.sh cycle --build   Zyklus inklusive echtem Bau (dauert einige Minuten)
 #
-# Optional: Zielverzeichnis als Argument, z. B.  bash test_und_aufraeumen.sh tests /home/pott/models/strata
+# Optional: Zielverzeichnis als Argument, z. B.  bash test_und_aufraeumen.sh tests ~/models/strata
 #
 # Der cycle-Modus arbeitet in einer WEGWERF-Kopie: dein Baum wird dabei nicht angefasst.
 set -uo pipefail
@@ -73,7 +73,7 @@ do_cleanup() {
       fi
     done
   else
-    info "kein altes Patch-Repo (pott/strata_patch) in der Nachbarschaft gefunden"
+    info "kein aelteres Einzel-Patch-Repo in der Nachbarschaft gefunden"
   fi
   # Neudateien alter Patches, die als Ueberreste herumliegen
   STALE=()
